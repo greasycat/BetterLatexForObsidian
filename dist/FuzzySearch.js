@@ -48,10 +48,10 @@ FuzzySearch.defaultOptions =
                                       // if false, bypass at least half the computation cost, very fast
                                       // also disable different token that score different field, because no more token!!
 
-    score_test_fused: false,          // Try one extra match where we disregard token separation.
+    score_test_fused: true,          // Try one extra match where we disregard token separation.
                                       // "oldman" match "old man"
 
-    score_acronym: false,             // jrrt match against John Ronald Reuel Tolkien
+    score_acronym: true,             // jrrt match against John Ronald Reuel Tolkien
     token_sep: " .,-:",
 
     //

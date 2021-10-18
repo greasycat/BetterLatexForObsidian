@@ -1,8 +1,8 @@
 import {App, PluginSettingTab, Setting, Notice} from 'obsidian'
 import BetterLatexForObsidian from "./main";
 
-const MODIFIER = ['ctrl', 'shift', 'alt']
-const VALID_SYMBOLS = [',', '.','/',';','\'', '[', ']', '\\', '-', '+']
+export const MODIFIER = ['ctrl', 'shift', 'alt']
+export const VALID_SYMBOLS = [',', '.','/',';','\'', '[', ']', '\\', '-', '+']
 export const COMMAND_ID = {
     moveDownHotkey:"better-latex-for-obsidian:move auto complete selection down",
     moveUpHotkey:"better-latex-for-obsidian:move auto complete selection up",

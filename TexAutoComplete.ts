@@ -1,7 +1,7 @@
-import CodeMirror from "codemirror";
+import CodeMirror, {off} from "codemirror";
 import FuzzySearch from "./dist/FuzzySearch";
 import {App, DataAdapter} from "obsidian";
-import {COMMAND_ID} from "./BetterLatexSetting";
+import {COMMAND_ID, MODIFIER} from "./BetterLatexSetting";
 
 const AUTOCOMPLETE_CLASS_TOKEN = {
     ITEM: 'tex-autocomplete-item',
@@ -101,6 +101,7 @@ export class TexAutoComplete {
     currentSelectedItemIndex: number;
     currentSuggestion: string[];
     manager: TexAutoCompleteManager;
+    lastKey: string
 
 
     constructor(manager: TexAutoCompleteManager, editor: CodeMirror.Editor, autoCompleteMenu: HTMLDivElement, texDataTable: any) {
@@ -111,6 +112,7 @@ export class TexAutoComplete {
         this.texDataTable = texDataTable;
         this.currentSelectedItemIndex = 0;
         this.manager = manager;
+        this.lastKey = "";
     }
 
     private static checkModifierKey(event: KeyboardEvent, modifiers: string) {
@@ -154,12 +156,10 @@ export class TexAutoComplete {
 
     public update = (cm: CodeMirror.Editor, event: KeyboardEvent) => {
         this.updateCurrentWord();
-        console.log(event.key)
         let doNotUpdate = false;
 
-        console.log(this.isMoveSelectionHotkeyPressed(event));
 
-        if (event.key == 'Control' || event.key == 'Alt') {
+        if (MODIFIER.contains(event.key)) {
             doNotUpdate = true;
         }
 
@@ -173,6 +173,28 @@ export class TexAutoComplete {
         if (event.key == 'Tab' && !this.isHidden) {
             this.replaceWordWithSelected();
             this.clearAndHideMenu();
+
+            let selected = this.currentSuggestion[this.currentSelectedItemIndex];
+            if (selected.startsWith("\\begin{")) {
+                let end = "\\end{" + selected.substring(6, selected.length - 1) + "}";
+                this.append(end);
+                this.moveCursorOnTheLine(cm, -end.length);
+            }
+            doNotUpdate = true;
+        }
+
+        if (event.key == "/")
+        {
+
+        }
+
+
+        if (event.key == '$') {
+            if (this.lastKey != '\\') // prevent \$ completion
+            {
+                this.append("$")
+                this.moveCursorOnTheLine(cm, -1);
+            }
         }
 
         if (!doNotUpdate) {
@@ -180,13 +202,13 @@ export class TexAutoComplete {
         }
         this.changeSize();
 
-
+        this.lastKey = event.key;
     }
 
-    public isKeyShortcut(event: KeyboardEvent) {
-        let result = false;
-
-        return result
+    public moveCursorOnTheLine(editor: CodeMirror.Editor, offset: number) {
+        let cursor = editor.getCursor();
+        cursor.ch += offset;
+        editor.setCursor(cursor);
     }
 
     public toggleAutoComplete() {
@@ -207,11 +229,13 @@ export class TexAutoComplete {
         if (this.currentSuggestion != undefined && this.currentSuggestion.length >= this.currentSelectedItemIndex) {
             let begin = this.editor.getCursor();
             begin.ch -= this.currentWord.length;
-            console.log(begin);
-            console.log(this.currentWord);
             this.editor.replaceRange(this.currentSuggestion[this.currentSelectedItemIndex], begin, this.editor.getCursor(), this.currentWord);
             this.editor.replaceSelection("");
         }
+    }
+
+    public append(text: string) {
+        this.editor.replaceRange(text, this.editor.getCursor());
     }
 
     public showAutoComplete() {
@@ -311,30 +335,22 @@ export class TexAutoComplete {
             this.currentWord = ' ';
         } else {
             let trimmedLineString = currentLineString.substr(0, currentCursorPosition.ch);
-            let lastBackSlashIndex = trimmedLineString.lastIndexOf("\\")
-            let lastSpaceIndex = trimmedLineString.lastIndexOf(" ");
-            let lastDollarIndex = trimmedLineString.lastIndexOf("$")
 
-            let unOrderList = [{
-                index: lastDollarIndex,
-                symbol: "$"
-            },
-                {
-                    index: lastSpaceIndex,
-                    symbol: " "
-                },
-                {
-                    symbol: "\\",
-                    index: lastBackSlashIndex
-                }];
+            let symbol = "`~!@#$%^&*()_+-={}|[]\\:\";\'<>?,./";
 
-            unOrderList.sort((a, b) => {
+            let symbolList = [];
+            for (let ch of symbol)
+            {
+                symbolList.push({symbol:ch, index:trimmedLineString.lastIndexOf(ch)});
+            }
+
+            symbolList.sort((a, b) => {
                 return b.index - a.index
             })
 
             let correctWordStartIndex;
 
-            correctWordStartIndex = unOrderList[0].index == -1 ? 0 : unOrderList[0].index;
+            correctWordStartIndex = symbolList[0].index == -1 ? 0 : symbolList[0].index;
 
             // if (lastBackSlashIndex != -1 && lastBackSlashIndex > lastSpaceIndex) {
             //     correctWordStartIndex = lastBackSlashIndex;
