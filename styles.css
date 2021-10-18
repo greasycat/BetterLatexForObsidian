@@ -1,4 +1,26 @@
 /* Sets all the text color to red! */
 body {
-    color: red;
+}
+
+.tex-autocomplete-item {
+
+}
+
+.tex-autocomplete-item-text {
+    margin-left: 5px;
+    margin-right: 30px;
+}
+
+.tex-autocomplete-menu {
+    z-index: var(--layout-menu);
+    position: fixed;
+    background: rgb(72,72,72);
+    opacity: 0.8;
+    border-left: dimgray solid 1px;
+    border-right: dimgray solid 1px;
+
+}
+
+.tex-autocomplete-item-selected {
+    background: dimgray;
 }

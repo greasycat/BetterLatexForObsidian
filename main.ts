@@ -1,112 +1,100 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import {builtinModules} from 'module';
+import {
+    Plugin,
+    Command,
+} from 'obsidian';
+import CodeMirror from "codemirror";
+import {TexAutoComplete, TexAutoCompleteManager} from './TexAutoComplete'
+import BetterLatexSetting from "./BetterLatexSetting";
+
 
 interface MyPluginSettings {
-	mySetting: string;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
 
-	async onload() {
-		console.log('loading plugin');
 
-		await this.loadSettings();
+export default class BetterLatexForObsidian extends Plugin {
+    settings: MyPluginSettings;
+    manager: TexAutoCompleteManager;
 
-		this.addRibbonIcon('dice', 'Sample Plugin', () => {
-			new Notice('This is a notice!');
-		});
 
-		this.addStatusBarItem().setText('Status Bar Text');
 
-		this.addCommand({
-			id: 'open-sample-modal',
-			name: 'Open Sample Modal',
-			// callback: () => {
-			// 	console.log('Simple Callback');
-			// },
-			checkCallback: (checking: boolean) => {
-				let leaf = this.app.workspace.activeLeaf;
-				if (leaf) {
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-					return true;
-				}
-				return false;
-			}
-		});
 
-		this.addSettingTab(new SampleSettingTab(this.app, this));
 
-		this.registerCodeMirror((cm: CodeMirror.Editor) => {
-			console.log('codemirror', cm);
-		});
 
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
 
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-	}
+    async onload() {
 
-	onunload() {
-		console.log('unloading plugin');
-	}
+        await this.loadSettings();
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
+        this.addSettingTab(new BetterLatexSetting(this.app, this));
 
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
+        this.manager = new TexAutoCompleteManager(this.app, await TexAutoComplete.readTexTables(this.app.vault.adapter));
+
+        this.registerCodeMirror((cm: CodeMirror.Editor) => {
+            let instanceIndex = this.manager.newInstance(cm);
+            cm.on("keyup", this.manager.getInstance(instanceIndex).update)
+            cm.on("focus", () => {
+                this.manager.setActiveInstance(instanceIndex);
+            });
+        });
+
+        this.addCommand(this.nextMenuItem);
+        this.addCommand(this.previousMenuItem);
+
+    }
+
+    previousMenuItem:Command = {
+        id: 'move auto complete selection up',
+        name: 'Move Auto Complete Selection Up',
+        hotkeys: [
+            {
+                modifiers:['Ctrl'],
+                key:'[',
+            }
+        ],
+        editorCallback: (editor, view) => {
+            if (this.manager != undefined) {
+                this.manager.moveActiveInstancePrevious();
+            }
+        }
+    }
+
+    nextMenuItem:Command = {
+        id: 'move auto complete selection down',
+        name: 'Move Auto Complete Selection Down',
+        hotkeys: [
+            {
+                modifiers:['Ctrl'],
+                key:']',
+            }
+        ],
+        editorCallback: (editor, view) => {
+            if (this.manager != undefined) {
+                this.manager.moveActiveInstanceNext();
+            }
+        }
+    }
+
+
+
+
+    onunload() {
+        this.manager.unload();
+    }
+
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
 
-	onClose() {
-		let {contentEl} = this;
-		contentEl.empty();
-	}
-}
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		let {containerEl} = this;
-
-		containerEl.empty();
-
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
-
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
-	}
-}
