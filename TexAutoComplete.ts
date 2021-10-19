@@ -2,6 +2,7 @@ import CodeMirror, {off} from "codemirror";
 import FuzzySearch from "./dist/FuzzySearch";
 import {App, DataAdapter} from "obsidian";
 import {COMMAND_ID, MODIFIER} from "./BetterLatexSetting";
+import {inspect} from "util";
 
 const AUTOCOMPLETE_CLASS_TOKEN = {
     ITEM: 'tex-autocomplete-item',
@@ -9,6 +10,28 @@ const AUTOCOMPLETE_CLASS_TOKEN = {
     MENU: 'tex-autocomplete-menu',
     ITEM_TEXT: 'tex-autocomplete-item-text',
 }
+
+const ENVIRONMENT_NAMES = [
+    'align',
+    'align*',
+    'alignat',
+    'array',
+    'Bmatrix',
+    'bmatrix',
+    'cases',
+    'eqnarray',
+    'eqnarray*',
+    'equation',
+    'gather',
+    'gather*',
+    'matrix',
+    'multline',
+    'pmatrix',
+    'smallmatrix',
+    'subarray',
+    'Vmatrix',
+    'vmatrix',
+]
 
 interface Hotkey {
     modifiers: string;
@@ -32,8 +55,15 @@ export class TexAutoCompleteManager {
         this.activeInstanceIndex = 0;
     }
 
-    public getActiveInstance() {
-        return this.texInstances[this.activeInstanceIndex];
+    // public getActiveInstance() {
+    //     return this.texInstances[this.activeInstanceIndex];
+    // }
+
+    private static initAutoCompleteMenu(): HTMLDivElement {
+        let autoCompleteMenu = document.createElement("div");
+        autoCompleteMenu.classList.add("tex-autocomplete-menu");
+        document.body.appendChild(autoCompleteMenu)
+        return autoCompleteMenu;
     }
 
     public setActiveInstance(activeInstanceIndex: number) {
@@ -51,16 +81,16 @@ export class TexAutoCompleteManager {
         return this.texInstanceCounter++;
     }
 
-    public getInstance(i: number) {
+    getInstance(i: number) {
         return this.texInstances[i];
     }
 
-    private static initAutoCompleteMenu(): HTMLDivElement {
-        console.log("init autocomplete menu")
-        let autoCompleteMenu = document.createElement("div");
-        autoCompleteMenu.classList.add("tex-autocomplete-menu");
-        document.body.appendChild(autoCompleteMenu)
-        return autoCompleteMenu;
+    public enableAllInstanceTexMode(enable:boolean)
+    {
+        this.texInstances.forEach((instance) => {
+            instance.clearAndHideMenu();
+            instance.enableTexMode(enable);
+        })
     }
 
     public unload() {
@@ -87,21 +117,25 @@ export class TexAutoCompleteManager {
 }
 
 export class TexAutoComplete {
-    editor: CodeMirror.Editor;
-    cursorPosition: {
-        left: number;
-        top: number;
-        bottom: number;
-    }
     autoCompleteMenu: HTMLDivElement;
-    isHidden: boolean;
-    currentItems: HTMLDivElement[];
+
+    editor: CodeMirror.Editor;
+    manager: TexAutoCompleteManager;
+
     texDataTable: any;
+
+    currentCursorPosition: CodeMirror.Position;
     currentWord: string;
     currentSelectedItemIndex: number;
     currentSuggestion: string[];
-    manager: TexAutoCompleteManager;
-    lastKey: string
+    currentItems: HTMLDivElement[];
+
+    previousKey: string;
+    previousWord: string;
+
+    isHidden: boolean;
+    isInScope: boolean;
+    isInTexMode: boolean;
 
 
     constructor(manager: TexAutoCompleteManager, editor: CodeMirror.Editor, autoCompleteMenu: HTMLDivElement, texDataTable: any) {
@@ -112,7 +146,37 @@ export class TexAutoComplete {
         this.texDataTable = texDataTable;
         this.currentSelectedItemIndex = 0;
         this.manager = manager;
-        this.lastKey = "";
+        this.previousKey = "";
+        this.isInTexMode = false;
+        this.isInScope = false;
+    }
+
+    public static async readTexTables(dataAdaptor: DataAdapter) {
+        let data = await dataAdaptor.read("./.obsidian/plugins/BetterLatexForObsidian/data.csv");
+        return data.split(/[\r|\n]+/)
+    }
+
+    /*
+    Static Method Here
+     */
+    public static selectNext(instance: TexAutoComplete) {
+        if (!instance.isHidden) {
+            if (instance.currentSelectedItemIndex == instance.currentItems.length - 1) {
+                instance.moveSelectedMenuItem(0);
+            } else {
+                instance.moveSelectedMenuItem(instance.currentSelectedItemIndex + 1);
+            }
+        }
+    }
+
+    public static selectPrevious(instance: TexAutoComplete) {
+        if (!instance.isHidden) {
+            if (instance.currentSelectedItemIndex == 0) {
+                instance.moveSelectedMenuItem(instance.currentItems.length - 1);
+            } else {
+                instance.moveSelectedMenuItem(instance.currentSelectedItemIndex - 1);
+            }
+        }
     }
 
     private static checkModifierKey(event: KeyboardEvent, modifiers: string) {
@@ -144,139 +208,109 @@ export class TexAutoComplete {
 
     }
 
-    public isMoveSelectionHotkeyPressed(event: KeyboardEvent) {
-        let result = false;
-
-        let moveUp = TexAutoComplete.getHotkeyAssignmentByCommandId(this.manager.app, COMMAND_ID.moveUpHotkey);
-        let moveDown = TexAutoComplete.getHotkeyAssignmentByCommandId(this.manager.app, COMMAND_ID.moveDownHotkey);
-
-        return (TexAutoComplete.checkModifierKey(event, moveUp.modifiers) && event.key == moveUp.key) || (TexAutoComplete.checkModifierKey(event, moveDown.modifiers) && event.key == moveDown.key)
-
-    }
-
-    public update = (cm: CodeMirror.Editor, event: KeyboardEvent) => {
-        this.updateCurrentWord();
-        let doNotUpdate = false;
-
-
-        if (MODIFIER.contains(event.key)) {
-            doNotUpdate = true;
-        }
-
-
-        if (this.isMoveSelectionHotkeyPressed(event)) {
-            this.replaceWordWithSelected();
-            doNotUpdate = true;
-        }
-
-
-        if (event.key == 'Tab' && !this.isHidden) {
-            this.replaceWordWithSelected();
-            this.clearAndHideMenu();
-
-            let selected = this.currentSuggestion[this.currentSelectedItemIndex];
-            if (selected.startsWith("\\begin{")) {
-                let end = "\\end{" + selected.substring(6, selected.length - 1) + "}";
-                this.append(end);
-                this.moveCursorOnTheLine(cm, -end.length);
-            }
-            doNotUpdate = true;
-        }
-
-        if (event.key == "/")
-        {
-
-        }
-
-
-        if (event.key == '$') {
-            if (this.lastKey != '\\') // prevent \$ completion
-            {
-                this.append("$")
-                this.moveCursorOnTheLine(cm, -1);
-            }
-        }
-
-        if (!doNotUpdate) {
-            this.toggleAutoComplete();
-        }
-        this.changeSize();
-
-        this.lastKey = event.key;
-    }
-
-    public moveCursorOnTheLine(editor: CodeMirror.Editor, offset: number) {
+    private static moveCursorOnTheLine(editor: CodeMirror.Editor, offset: number) {
         let cursor = editor.getCursor();
         cursor.ch += offset;
         editor.setCursor(cursor);
     }
 
-    public toggleAutoComplete() {
-        if (this.currentWord != undefined) {
-            console.log(this.currentWord)
-            if (this.currentWord.startsWith("\\") && !this.currentWord.contains("$")) {
+    private static createAutoCompleteMenuItem(text: string): HTMLDivElement {
+        let menuItem = document.createElement("div");
+        menuItem.classList.add("tex-autocomplete-item")
+        let span = document.createElement("span")
+        span.setText(text);
+        span.classList.add("tex-autocomplete-item-text");
+        menuItem.append(span);
+        return menuItem;
+    }
 
-                this.removeAllMenuItems();
-                this.showAutoComplete();
-            } else if (this.currentWord == ' ' || this.currentWord == '' || !this.currentWord.startsWith("\\") || this.currentWord.contains("$")) {
-                this.clearAndHideMenu();
+    private static getHotkeyAssignmentByCommandId(app: App, commandId: string): Hotkey {
+        // @ts-ignore
+        if (app.hotkeyManager.baked == true) {
+            // @ts-ignore
+            let moveDownHotkeyIndex = app.hotkeyManager.bakedIds.findIndex((id) => id == commandId);
+            // @ts-ignore
+            return app.hotkeyManager.bakedHotkeys[moveDownHotkeyIndex];
+        }
+        return undefined;
+    }
+
+    public enableTexMode(enable:boolean)
+    {
+        this.isInTexMode = enable;
+    }
+
+    public update = (cm: CodeMirror.Editor, event: KeyboardEvent) => {
+
+        if (this.isInTexMode) {
+
+            // console.log("***" +
+            //     "***" +
+            //     "***")
+
+            //Ignore modifier keydown
+            if (!MODIFIER.contains(event.key)) {
+                let doNotAutoComplete = false;
+
+                this.currentCursorPosition = cm.getCursor();
+                this.updateCurrentWord();
+
+
+                if (this.isMoveSelectionHotkeyPressed(event)) {
+                    this.replaceWordWithSelected();
+                    doNotAutoComplete = true;
+                }
+
+
+                if (event.key == 'Tab' && !this.isHidden) {
+                    this.currentWord = this.previousWord;
+                    this.currentCursorPosition.ch--;
+
+                    if (ENVIRONMENT_NAMES.contains(this.currentSuggestion[this.currentSelectedItemIndex].toLowerCase())) {
+                        let envText = this.currentSuggestion[this.currentSelectedItemIndex];
+                        let text = "{" + envText + "}\\end{" + envText + "}";
+                        this.replaceWord(text);
+                        TexAutoComplete.moveCursorOnTheLine(cm, -(envText.length + 6));
+                    } else {
+
+                        this.replaceWordWithSelected();
+                    }
+                    this.clearAndHideMenu();
+                    doNotAutoComplete = true;
+                }
+
+                if (event.key == 'Esc' && !this.isHidden) {
+                    this.clearAndHideMenu();
+                    doNotAutoComplete = true;
+                }
+
+                if (event.key == "/") {
+
+                }
+
+
+                if (event.key == '$') {
+                    if (this.previousKey != '\\') // prevent \$ completion
+                    {
+                        this.append("$")
+                        TexAutoComplete.moveCursorOnTheLine(cm, -1);
+                    }
+                }
+
+                if (!doNotAutoComplete) {
+                    this.toggleAutoComplete();
+                }
+                this.changeSize();
+
+                this.previousKey = event.key;
             }
         }
-    }
-
-
-    public replaceWordWithSelected() {
-        if (this.currentSuggestion != undefined && this.currentSuggestion.length >= this.currentSelectedItemIndex) {
-            let begin = this.editor.getCursor();
-            begin.ch -= this.currentWord.length;
-            this.editor.replaceRange(this.currentSuggestion[this.currentSelectedItemIndex], begin, this.editor.getCursor(), this.currentWord);
-            this.editor.replaceSelection("");
-        }
-    }
-
-    public append(text: string) {
-        this.editor.replaceRange(text, this.editor.getCursor());
-    }
-
-    public showAutoComplete() {
-        console.log("Show AC");
-        this.cursorPosition = this.editor.cursorCoords(true);
-        let style = "left: " + this.cursorPosition.left + "px; top:" + (this.cursorPosition.top + 10) + "px;"
-        this.autoCompleteMenu.setAttribute('style', style);
-        this.currentSuggestion = this.getSuggestions();
-        this.generateMenuItems(this.currentSuggestion);
-        this.isHidden = false;
     }
 
     public clearAndHideMenu() {
         this.removeAllMenuItems();
         this.autoCompleteMenu.style.visibility = "hidden"
         this.isHidden = true;
-    }
-
-    public moveSelectedMenuItem(index: number) {
-        if (this.currentItems != undefined && this.currentItems.length >= index + 1) {
-            this.currentItems[this.currentSelectedItemIndex].classList.remove(AUTOCOMPLETE_CLASS_TOKEN.SELECTED_ITEM);
-            this.currentItems[index].classList.add(AUTOCOMPLETE_CLASS_TOKEN.SELECTED_ITEM);
-            this.currentSelectedItemIndex = index;
-        }
-    }
-
-    public generateMenuItems(items: Array<string>) {
-        if (this.currentItems == undefined) {
-            this.currentItems = [];
-        }
-
-        items.forEach((item) => {
-            let i = this.createAutoCompleteMenuItem(item);
-            this.currentItems.push(i);
-            this.autoCompleteMenu.appendChild(i);
-        });
-
-        if (this.currentItems.length >= 1) {
-            this.currentItems[0].classList.add("tex-autocomplete-item-selected")
-            this.currentSelectedItemIndex = 0;
-        }
     }
 
     public removeAllMenuItems() {
@@ -290,25 +324,104 @@ export class TexAutoComplete {
         this.currentItems = [];
     }
 
-    public createAutoCompleteMenuItem(text: string): HTMLDivElement {
-        let menuItem = document.createElement("div");
-        menuItem.classList.add("tex-autocomplete-item")
-        let span = document.createElement("span")
-        span.setText(text);
-        span.classList.add("tex-autocomplete-item-text");
-        menuItem.append(span);
-        return menuItem;
+    private isMoveSelectionHotkeyPressed(event: KeyboardEvent) {
+        let moveUp = TexAutoComplete.getHotkeyAssignmentByCommandId(this.manager.app, COMMAND_ID.moveUpHotkey);
+        let moveDown = TexAutoComplete.getHotkeyAssignmentByCommandId(this.manager.app, COMMAND_ID.moveDownHotkey);
+
+        return (TexAutoComplete.checkModifierKey(event, moveUp.modifiers) && event.key == moveUp.key) || (TexAutoComplete.checkModifierKey(event, moveDown.modifiers) && event.key == moveDown.key)
+
+    }
+
+    private toggleAutoComplete() {
+        if (this.currentWord != undefined) {
+            // console.log("Last word")
+            // console.log(this.previousWord);
+            console.log("This word");
+            console.log(this.currentWord)
+            // console.log("....")
+            if (this.currentWord.startsWith("\\") || (this.currentWord.startsWith("{") && this.previousWord == '\\begin')) {
+
+                this.removeAllMenuItems();
+                this.showAutoComplete();
+            } else if (this.currentWord == ' ' || this.currentWord == '' || this.currentWord == '\t' || !this.currentWord.startsWith("\\")) {
+                this.clearAndHideMenu();
+            }
+        }
     }
 
 
-    public getSuggestions() {
+    private replaceWordWithSelected() {
+        if (this.currentSuggestion != undefined && this.currentSuggestion.length >= this.currentSelectedItemIndex) {
+            // this.currentWord = this.currentWord.trim();
+            let begin = this.currentCursorPosition;
+            console.log(begin.ch);
+            console.log(this.currentWord)
+            console.log(this.currentWord.length)
+            begin.ch -= this.currentWord.length;
+            this.editor.replaceRange(this.currentSuggestion[this.currentSelectedItemIndex], begin, this.editor.getCursor());
+            this.editor.replaceSelection("");
+            this.currentWord = this.currentSuggestion[this.currentSelectedItemIndex];
+        }
+    }
+
+    private replaceWord(text: string) {
+        let begin = this.currentCursorPosition;
+        console.log(begin.ch);
+        console.log(this.currentWord)
+        console.log(this.currentWord.length)
+        begin.ch -= this.currentWord.length;
+        console.log(text);
+        this.editor.replaceRange(text, begin, this.editor.getCursor());
+        this.editor.replaceSelection("");
+    }
+
+    private append(text: string) {
+        this.editor.replaceRange(text, this.editor.getCursor());
+    }
+
+
+    private showAutoComplete() {
+        let rawCursorPosition = this.editor.cursorCoords(true);
+        let style = "left: " + rawCursorPosition.left + "px; top:" + (rawCursorPosition.top + 10) + "px;"
+        this.autoCompleteMenu.setAttribute('style', style);
+        this.currentSuggestion = this.getSuggestions();
+        this.generateMenuItems(this.currentSuggestion);
+        this.isHidden = false;
+    }
+
+    private moveSelectedMenuItem(index: number) {
+        if (this.currentItems != undefined && this.currentItems.length >= index + 1) {
+            this.currentItems[this.currentSelectedItemIndex].classList.remove(AUTOCOMPLETE_CLASS_TOKEN.SELECTED_ITEM);
+            this.currentItems[index].classList.add(AUTOCOMPLETE_CLASS_TOKEN.SELECTED_ITEM);
+            this.currentSelectedItemIndex = index;
+        }
+    }
+
+    private generateMenuItems(items: Array<string>) {
+        if (this.currentItems == undefined) {
+            this.currentItems = [];
+        }
+
+        items.forEach((item) => {
+            let i = TexAutoComplete.createAutoCompleteMenuItem(item);
+            this.currentItems.push(i);
+            this.autoCompleteMenu.appendChild(i);
+        });
+
+        if (this.currentItems.length >= 1) {
+            this.currentItems[0].classList.add("tex-autocomplete-item-selected")
+            this.currentSelectedItemIndex = 0;
+        }
+    }
+
+    private getSuggestions() {
         let searcher = new FuzzySearch({source: this.texDataTable});
         // @ts-ignore
         let result = searcher.search(this.currentWord);
         return result.slice(0, 5);
     }
 
-    public changeSize() {
+    private changeSize() {
         let bodyCss = document.body.style.cssText;
         let start = document.body.style.cssText.indexOf("font-size");
         let font = bodyCss.substr(start + 10, 4);
@@ -322,13 +435,7 @@ export class TexAutoComplete {
         this.autoCompleteMenu.style.marginTop = font;
     }
 
-
-    public static async readTexTables(dataAdaptor: DataAdapter) {
-        let data = await dataAdaptor.read("./.obsidian/plugins/BetterLatexForObsidian/data.csv");
-        return data.split(",,,\r\n")
-    }
-
-    public updateCurrentWord() {
+    private updateCurrentWord() {
         let currentCursorPosition = this.editor.getCursor();
         let currentLineString = this.editor.getLine(currentCursorPosition.line);
         if (currentLineString[currentCursorPosition.ch - 1] == ' ') {
@@ -336,76 +443,29 @@ export class TexAutoComplete {
         } else {
             let trimmedLineString = currentLineString.substr(0, currentCursorPosition.ch);
 
-            let symbol = "`~!@#$%^&*()_+-={}|[]\\:\";\'<>?,./";
-
+            let symbol = "`~!@#$%^&*()_+-={}|[]\\:\";\'<>?,./ \t";
             let symbolList = [];
-            for (let ch of symbol)
-            {
-                symbolList.push({symbol:ch, index:trimmedLineString.lastIndexOf(ch)});
+
+            for (let ch of symbol) {
+                symbolList.push({symbol: ch, index: trimmedLineString.lastIndexOf(ch)});
             }
 
             symbolList.sort((a, b) => {
                 return b.index - a.index
             })
 
-            let correctWordStartIndex;
-
-            correctWordStartIndex = symbolList[0].index == -1 ? 0 : symbolList[0].index;
-
-            // if (lastBackSlashIndex != -1 && lastBackSlashIndex > lastSpaceIndex) {
-            //     correctWordStartIndex = lastBackSlashIndex;
-            // } else if (lastSpaceIndex != -1 && lastSpaceIndex > lastBackSlashIndex) {
-            //     correctWordStartIndex = lastSpaceIndex;
-            // } else {
-            //     correctWordStartIndex = 0;
-            // }
-
-            this.currentWord = trimmedLineString.substring(correctWordStartIndex, trimmedLineString.length);
-        }
-    }
-
-    /*
-    Static Method Here
-     */
-    public static selectNext(instance: TexAutoComplete) {
-        if (!instance.isHidden) {
-            if (instance.currentSelectedItemIndex == instance.currentItems.length - 1) {
-                instance.moveSelectedMenuItem(0);
-            } else {
-                instance.moveSelectedMenuItem(instance.currentSelectedItemIndex + 1);
+            let correctWordStartIndex = symbolList[0].index == -1 ? 0 : symbolList[0].index;
+            let lastWordStartIndex = -1
+            if (symbolList.length > 1) {
+                lastWordStartIndex = symbolList[1].index;
+                this.previousWord = trimmedLineString.substring(lastWordStartIndex, correctWordStartIndex);
+                console.log(this.previousWord);
             }
+
+            this.currentWord = trimmedLineString.substring(correctWordStartIndex, trimmedLineString.length).trim();
         }
     }
 
-    public static selectPrevious(instance: TexAutoComplete) {
-        if (!instance.isHidden) {
-            if (instance.currentSelectedItemIndex == 0) {
-                instance.moveSelectedMenuItem(instance.currentItems.length - 1);
-            } else {
-                instance.moveSelectedMenuItem(instance.currentSelectedItemIndex - 1);
-            }
-        }
-    }
-
-    public static getAutoCompleterByEditor(instances: TexAutoComplete[], cm: CodeMirror.Editor): TexAutoComplete {
-        for (let i of instances) {
-            if (i.editor == cm) {
-                return i
-            }
-        }
-        return undefined;
-    }
-
-    public static getHotkeyAssignmentByCommandId(app: App, commandId: string): Hotkey {
-        // @ts-ignore
-        if (app.hotkeyManager.baked == true) {
-            // @ts-ignore
-            let moveDownHotkeyIndex = app.hotkeyManager.bakedIds.findIndex((id) => id == commandId);
-            // @ts-ignore
-            return app.hotkeyManager.bakedHotkeys[moveDownHotkeyIndex];
-        }
-        return undefined;
-    }
 
     /*
     Commands for Obsidian

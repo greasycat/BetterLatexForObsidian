@@ -1,7 +1,7 @@
-import {App, PluginSettingTab, Setting, Notice} from 'obsidian'
+import {App, PluginSettingTab, Setting, Notice, ToggleComponent} from 'obsidian'
 import BetterLatexForObsidian from "./main";
 
-export const MODIFIER = ['ctrl', 'shift', 'alt']
+export const MODIFIER = ['Control', 'Shift', 'Alt']
 export const VALID_SYMBOLS = [',', '.','/',';','\'', '[', ']', '\\', '-', '+']
 export const COMMAND_ID = {
     moveDownHotkey:"better-latex-for-obsidian:move auto complete selection down",
@@ -19,6 +19,19 @@ export default class BetterLatexSetting extends PluginSettingTab {
     display(): any {
         this.containerEl.empty();
         this.containerEl.createEl('h2', {text:"BetterLatex Setting Page"});
+
+        new Setting(this.containerEl)
+            .setName("Enable LaTex Mode")
+            .setDesc("You can setup a hotkey for this in the Hotkey setting")
+            .addToggle(toggleComponent => toggleComponent
+                .setValue(this.plugin.settings.texMode)
+                .onChange(async (value) => {
+                    this.plugin.settings.texMode = value;
+                    this.plugin.manager.enableAllInstanceTexMode(value);
+                    await this.plugin.saveSettings();
+                    this.plugin.syncStatusBarWithLatexMode();
+                })
+            )
 
         // new Setting(this.containerEl)
         //     .setName("Move Down Hotkey")

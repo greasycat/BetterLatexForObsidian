@@ -1,7 +1,7 @@
 import {builtinModules} from 'module';
 import {
     Plugin,
-    Command,
+    Command, Notice,
 } from 'obsidian';
 import CodeMirror from "codemirror";
 import {TexAutoComplete, TexAutoCompleteManager} from './TexAutoComplete'
@@ -9,9 +9,11 @@ import BetterLatexSetting from "./BetterLatexSetting";
 
 
 interface MyPluginSettings {
+    texMode:boolean;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
+    texMode : true,
 }
 
 
@@ -19,13 +21,7 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 export default class BetterLatexForObsidian extends Plugin {
     settings: MyPluginSettings;
     manager: TexAutoCompleteManager;
-
-
-
-
-
-
-
+    statusBar: HTMLElement;
     async onload() {
 
         await this.loadSettings();
@@ -36,15 +32,26 @@ export default class BetterLatexForObsidian extends Plugin {
 
         this.registerCodeMirror((cm: CodeMirror.Editor) => {
             let instanceIndex = this.manager.newInstance(cm);
+            this.manager.getInstance(instanceIndex).enableTexMode(this.settings.texMode);
             cm.on("keyup", this.manager.getInstance(instanceIndex).update)
             cm.on("focus", () => {
                 this.manager.setActiveInstance(instanceIndex);
             });
         });
 
+        this.statusBar = this.addStatusBarItem();
+        this.syncStatusBarWithLatexMode();
+
         this.addCommand(this.nextMenuItem);
         this.addCommand(this.previousMenuItem);
+        this.addCommand(this.toggleTexMode);
 
+    }
+
+    public syncStatusBarWithLatexMode(){
+        let status = (this.settings.texMode)? "On": "Off";
+        this.statusBar.setText("Latex Mode: "+status);
+        new Notice("Latex Mode: "+status);
     }
 
     previousMenuItem:Command = {
@@ -79,11 +86,22 @@ export default class BetterLatexForObsidian extends Plugin {
         }
     }
 
+    toggleTexMode:Command = {
+        id: "toggle latex mode",
+        name: "Toggle Latex Mode",
+        editorCallback: ((editor, view) => {
+            this.settings.texMode = !this.settings.texMode;
+            this.manager.enableAllInstanceTexMode(this.settings.texMode);
+            this.syncStatusBarWithLatexMode();
+        })
+    }
 
 
 
-    onunload() {
+
+    async onunload() {
         this.manager.unload();
+        await this.saveSettings();
     }
 
     async loadSettings() {
