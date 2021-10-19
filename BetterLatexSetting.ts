@@ -71,24 +71,24 @@ export default class BetterLatexSetting extends PluginSettingTab {
         //     )
     }
 
-    private static checkHotkeyValidity(text:string)
-    {
-        let hotkeySet = text.trim().split(" ");
-        // if (hotkeySet.length == 0 || hotkeySet.length>2)
-        // {
-        //     return false;
-        // }
-
-        if (hotkeySet.length == 2)
-        {
-            if (MODIFIER.contains(hotkeySet[0]) && hotkeySet[0] != hotkeySet[1])
-            {
-                return hotkeySet[1].match(/^[a-z0-9]+$/i) || VALID_SYMBOLS.contains(hotkeySet[1]);
-            }
-        }
-
-        return false;
-    }
+    // private static checkHotkeyValidity(text:string)
+    // {
+    //     let hotkeySet = text.trim().split(" ");
+    //     // if (hotkeySet.length == 0 || hotkeySet.length>2)
+    //     // {
+    //     //     return false;
+    //     // }
+    //
+    //     if (hotkeySet.length == 2)
+    //     {
+    //         if (MODIFIER.contains(hotkeySet[0]) && hotkeySet[0] != hotkeySet[1])
+    //         {
+    //             return hotkeySet[1].match(/^[a-z0-9]+$/i) || VALID_SYMBOLS.contains(hotkeySet[1]);
+    //         }
+    //     }
+    //
+    //     return false;
+    // }
 
 
 }

@@ -6,6 +6,7 @@ import {
 import CodeMirror from "codemirror";
 import {TexAutoComplete, TexAutoCompleteManager} from './TexAutoComplete'
 import BetterLatexSetting from "./BetterLatexSetting";
+import {dataTable} from "./data";
 
 
 interface MyPluginSettings {
@@ -28,7 +29,9 @@ export default class BetterLatexForObsidian extends Plugin {
 
         this.addSettingTab(new BetterLatexSetting(this.app, this));
 
-        this.manager = new TexAutoCompleteManager(this.app, await TexAutoComplete.readTexTables(this.app.vault.adapter));
+        this.manager = new TexAutoCompleteManager(this.app, dataTable.split(/[\r|\n]+/));
+        console.log("data loaded");
+        // this.manager = new TexAutoCompleteManager(this.app, await TexAutoComplete.readTexTables(this.app.vault.adapter));
 
         this.registerCodeMirror((cm: CodeMirror.Editor) => {
             let instanceIndex = this.manager.newInstance(cm);
