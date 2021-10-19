@@ -1,10 +1,10 @@
 {
 	"id": "better-latex-for-obsidian",
 	"name": "Better Latex For Obsidian",
-	"version": "1.0.1",
+	"version": "0.0.1",
 	"minAppVersion": "0.9.12",
 	"description": "This plugin offers LaTex autocomplete functionality",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md/about",
+	"author": "GreasyCat",
+	"authorUrl": "https://github.com/echaos",
 	"isDesktopOnly": false
 }
