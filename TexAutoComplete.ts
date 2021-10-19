@@ -244,10 +244,6 @@ export class TexAutoComplete {
 
         if (this.isInTexMode) {
 
-            // console.log("***" +
-            //     "***" +
-            //     "***")
-
             //Ignore modifier keydown
             if (!MODIFIER.contains(event.key)) {
                 let doNotAutoComplete = false;
@@ -334,13 +330,7 @@ export class TexAutoComplete {
 
     private toggleAutoComplete() {
         if (this.currentWord != undefined) {
-            // console.log("Last word")
-            // console.log(this.previousWord);
-            console.log("This word");
-            console.log(this.currentWord)
-            // console.log("....")
             if (this.currentWord.startsWith("\\") || (this.currentWord.startsWith("{") && this.previousWord == '\\begin')) {
-
                 this.removeAllMenuItems();
                 this.showAutoComplete();
             } else if (this.currentWord == ' ' || this.currentWord == '' || this.currentWord == '\t' || !this.currentWord.startsWith("\\")) {
@@ -354,9 +344,6 @@ export class TexAutoComplete {
         if (this.currentSuggestion != undefined && this.currentSuggestion.length >= this.currentSelectedItemIndex) {
             // this.currentWord = this.currentWord.trim();
             let begin = this.currentCursorPosition;
-            console.log(begin.ch);
-            console.log(this.currentWord)
-            console.log(this.currentWord.length)
             begin.ch -= this.currentWord.length;
             this.editor.replaceRange(this.currentSuggestion[this.currentSelectedItemIndex], begin, this.editor.getCursor());
             this.editor.replaceSelection("");
@@ -366,11 +353,7 @@ export class TexAutoComplete {
 
     private replaceWord(text: string) {
         let begin = this.currentCursorPosition;
-        console.log(begin.ch);
-        console.log(this.currentWord)
-        console.log(this.currentWord.length)
         begin.ch -= this.currentWord.length;
-        console.log(text);
         this.editor.replaceRange(text, begin, this.editor.getCursor());
         this.editor.replaceSelection("");
     }
@@ -459,7 +442,6 @@ export class TexAutoComplete {
             if (symbolList.length > 1) {
                 lastWordStartIndex = symbolList[1].index;
                 this.previousWord = trimmedLineString.substring(lastWordStartIndex, correctWordStartIndex);
-                console.log(this.previousWord);
             }
 
             this.currentWord = trimmedLineString.substring(correctWordStartIndex, trimmedLineString.length).trim();
