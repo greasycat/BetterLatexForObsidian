@@ -324,7 +324,7 @@ export class TexAutoComplete {
         let moveUp = TexAutoComplete.getHotkeyAssignmentByCommandId(this.manager.app, COMMAND_ID.moveUpHotkey);
         let moveDown = TexAutoComplete.getHotkeyAssignmentByCommandId(this.manager.app, COMMAND_ID.moveDownHotkey);
 
-        return (TexAutoComplete.checkModifierKey(event, moveUp.modifiers) && event.key == moveUp.key) || (TexAutoComplete.checkModifierKey(event, moveDown.modifiers) && event.key == moveDown.key)
+        return (TexAutoComplete.checkModifierKey(event, moveUp.modifiers) && event.key == moveUp.key.toLowerCase()) || (TexAutoComplete.checkModifierKey(event, moveDown.modifiers) && event.key == moveDown.key.toLowerCase())
 
     }
 
