@@ -1,6 +1,7 @@
 # Better Latex For Obsidian
 
 This plugin offers LaTex autocomplete function
+Very Very early version
 
 # Screenshots
 ![image.png](https://i.loli.net/2021/10/20/1jetPWdAbxB92sM.png)
